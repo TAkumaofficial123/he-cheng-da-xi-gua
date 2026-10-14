@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>合成大西瓜</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 14px 10px 30px;
+    background: linear-gradient(160deg, #ffe3ee 0%, #e3f4ff 55%, #e9ffef 100%);
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    color: #4a4458;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #app { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  h1 { font-size: 26px; letter-spacing: 2px; color: #ff5d8f; text-shadow: 0 2px 0 #fff; }
+  .scores { display: flex; gap: 10px; }
+  .score-box {
+    background: rgba(255,255,255,0.75);
+    border-radius: 12px;
+    padding: 4px 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(120, 90, 140, 0.12);
+    min-width: 76px;
+  }
+  .score-box .label { display: block; font-size: 12px; color: #9a92ab; }
+  .score-box b { font-size: 22px; color: #3d3752; }
+  #mid { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+  #stage { position: relative; }
+  canvas#game {
+    display: block;
+    width: min(480px, 100%);   /* JS 会按逻辑尺寸覆盖；100vw 含滚动条宽度，故用 100% */
+    height: auto;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(90, 70, 120, 0.25);
+    touch-action: none;
+    cursor: crosshair;
+  }
+  #banner {
+    position: absolute;
+    left: 50%;
+    top: 36%;
+    transform: translate(-50%,-50%) scale(0.5);
+    opacity: 0;
+    pointer-events: none;
+    font-size: 34px;
+    font-weight: 800;
+    white-space: nowrap;
+    color: #ff5d8f;
+    text-shadow: 0 2px 0 #fff, 0 6px 18px rgba(214, 61, 132, 0.35);
+    transition: opacity .25s ease, transform .25s cubic-bezier(.2,1.6,.4,1);
+  }
+  #banner.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  #overPanel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;   /* 不用 inset:0：Safari <14.1 等老浏览器不支持 */
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(28, 24, 46, 0.55);
+    backdrop-filter: blur(3px);
+    border-radius: 14px;
+    color: #fff;
+  }
+  #overPanel.show { display: flex; }
+  .over-title { font-size: 30px; font-weight: 800; letter-spacing: 4px; }
+  .over-score { font-size: 16px; }
+  .over-score b { font-size: 26px; color: #ffd166; }
+  button {
+    border: none;
+    cursor: pointer;
+    padding: 10px 26px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #fff;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ff7ea8, #ff5d8f);
+    box-shadow: 0 4px 14px rgba(255, 93, 143, 0.45);
+    transition: transform .12s ease, box-shadow .12s ease;
+    font-family: inherit;
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(255, 93, 143, 0.5); }
+  button:active { transform: translateY(0); }
+  #side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 150px;
+    background: rgba(255,255,255,0.55);
+    border-radius: 16px;
+    padding: 14px 12px;
+    box-shadow: 0 6px 18px rgba(90, 70, 120, 0.15);
+  }
+  #side .label { font-size: 13px; color: #9a92ab; }
+  #nextBall {
+    background: rgba(255,255,255,0.85);
+    border-radius: 12px;
+    box-shadow: inset 0 2px 6px rgba(120,90,140,0.15);
+  }
+  .ctl-group { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .ctl-row { display: flex; align-items: center; gap: 5px; }
+  .ctl-row .dim { font-size: 13px; color: #7c7490; min-width: 14px; text-align: center; }
+  .ctl-row b { font-size: 13px; color: #4a4458; min-width: 34px; text-align: center; }
+  #autoToggle, .ctl-row .step {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    border-radius: 8px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #9b8cff, #7c6cf0);
+    box-shadow: 0 2px 8px rgba(124, 108, 240, 0.4);
+  }
+  .ctl-row .step { min-width: 28px; font-size: 14px; padding: 2px 8px; }
+  #autoToggle.on { background: linear-gradient(135deg, #5fd68a, #2fae5f); box-shadow: 0 2px 8px rgba(47, 174, 95, 0.45); }
+  #autoToggle:hover, .ctl-row .step:hover, #autoGear:hover { transform: translateY(-1px); }
+
+  /* 挡位下拉框：白底黑字，光标移上去变蓝 */
+  #autoGear {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e1a2e;
+    background: #fff;
+    border: 1px solid #d8d2e8;
+    border-radius: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(90, 70, 120, 0.15);
+  }
+  #autoGear:hover { background: #dbeafe; border-color: #4a90e2; }
+  #autoGear option { background: #fff; color: #1e1a2e; }
+  #autoGear option:hover, #autoGear option:checked { background: #3b82f6; color: #fff; }
+  .hint { font-size: 12.5px; line-height: 1.8; color: #7c7490; text-align: center; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🍉 合成大西瓜</h1>
+      <div class="scores">
+        <div class="score-box"><span class="label">分数</span><b id="score">0</b></div>
+        <div class="score-box"><span class="label">最高</span><b id="best">0</b></div>
+      </div>
+    </header>
+    <div id="mid">
+      <div id="stage">
+        <canvas id="game"></canvas>
+        <div id="banner"></div>
+        <div id="overPanel">
+          <div class="over-title">游戏结束</div>
+          <div class="over-score">本局得分 <b id="finalScore">0</b></div>
+          <button id="restart">再来一局（R）</button>
+        </div>
+      </div>
+      <div id="side">
+        <span class="label">下一个</span>
+        <canvas id="nextBall"></canvas>
+
+        <div class="ctl-group">
+          <span class="label">自动落球（A 键）· 挡位</span>
+          <div class="ctl-row">
+            <button id="autoToggle">开</button>
+            <select id="autoGear">
+              <option value="1000" selected>1 秒</option>
+              <option value="500">0.5 秒</option>
+              <option value="200">0.2 秒</option>
+              <option value="100">0.1 秒</option>
+              <option value="50">0.05 秒</option>
+              <option value="40">0.04 秒</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <span class="label">边框尺寸（局内调整，不重开）</span>
+          <div class="ctl-row">
+            <span class="dim">宽</span>
+            <button class="step" data-dim="w" data-d="-20">−</button>
+            <b id="wVal">480</b>
+            <button class="step" data-dim="w" data-d="20">＋</button>
+          </div>
+          <div class="ctl-row">
+            <span class="dim">长</span>
+            <button class="step" data-dim="h" data-d="-20">−</button>
+            <b id="hVal">660</b>
+            <button class="step" data-dim="h" data-d="20">＋</button>
+          </div>
+        </div>
+
+        <button id="restart2">重新开始</button>
+        <p class="hint">移动瞄准 · 点击落球<br/>相同数字相撞即可合成<br/>球堆持续越过红线就失败</p>
+      </div>
+    </div>
+  </div>
+  <script src="matter.min.js"></script>
+  <script src="sim.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

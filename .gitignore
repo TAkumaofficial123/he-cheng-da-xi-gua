@@ -1,0 +1,7 @@
+# 本地工具配置
+.claude/
+
+# 审查/验证代理的一次性脚本目录
+_verify_tmp/
+
+node_modules/
